@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Windows;
 using System.Drawing;
 using System.IO;
 using System.Security.Cryptography;
@@ -28,46 +29,57 @@ namespace Secret_Decoder {
             //NOTE: DESIGNATED STOP GLYPH - GLYPH: ¸ | CODE: U+00B8 | DECIMAL: 0184 | HTML: &cedil; | NUMBER: 0120
             //SET FOR GLOBAL
             bmp = bitmap;
-            SetupDecoder(bmp, txtBox);
+            if(SetupDecoder(bmp, txtBox)) {
 
-            //IF SETSTART RETURNS 0 , 0 SEND ERROR TO OUTPUT BOX
-            if(xPos < 0 && yPos <  0) {
+                //IF SETSTART RETURNS 0 , 0 SEND ERROR TO OUTPUT BOX
+                if(xPos < 0 && yPos <  0) {
+                    stringBuilder.Clear();
+                    stringBuilder.Append("ERROR: THE IMAGE YOU DECODED DOESN'T HAVE A MESSAGE OR YOU DIDN'T SET THE X AND Y POSITIONS CORRECTLY");
+                    return stringBuilder;
+                }//end if
+
+                //IF STRINGBUILDER HAS WORDS CLEAR
+                if(stringBuilder.Length > 0) {
+                    stringBuilder.Clear();
+                }//end if
+
+                //GRAB FIRST LETTER
+                stringBuilder.Append(GrabLetter());
+
+                for(int index = 0; index <= 255; index++) {
+                    //GRAB NEXT POINT
+                    NextPoint();
+
+                    if(stringBuilder[stringBuilder.Length - 1] == stopChar) {
+                        //IF CHAR IS STOP CHAR END STRING
+                        return stringBuilder;
+                    } else {
+                        //APPEND(STORE) GRABBED LETTERS
+                        stringBuilder.Append(GrabLetter());
+                    } //end if                
+                }//end for            
+
+                return stringBuilder;
+            } else {
                 stringBuilder.Clear();
                 stringBuilder.Append("ERROR: THE IMAGE YOU DECODED DOESN'T HAVE A MESSAGE OR YOU DIDN'T SET THE X AND Y POSITIONS CORRECTLY");
                 return stringBuilder;
-            }//end if
-
-            //IF STRINGBUILDER HAS WORDS CLEAR
-            if(stringBuilder.Length > 0) {
-                stringBuilder.Clear();
-            }//end if
-
-            //GRAB FIRST LETTER
-            stringBuilder.Append(GrabLetter());
-
-            for(int index = 0; index <= 255; index++) {
-                //GRAB NEXT POINT
-                NextPoint();
-
-                if(stringBuilder[stringBuilder.Length - 1] == stopChar) {
-                    //IF CHAR IS STOP CHAR END STRING
-                    return stringBuilder;
-                } else {
-                    //APPEND(STORE) GRABBED LETTERS
-                    stringBuilder.Append(GrabLetter());
-                } //end if                
-            }//end for            
-
-            return stringBuilder;
+            }
         }//end method
 
         private bool SetupDecoder(Bitmap bmp, TextBox txtbox) {
-            increment = (int)Math.Round(((double)bmp.Width/5) + ((double)bmp.Height/5)/5);
-            if(increment < 1) {
-                increment = 1;
-            }//end if
+            try {
 
-            return SetStart(txtbox);
+                increment = (int)Math.Round(((double)bmp.Width/5) + ((double)bmp.Height/5)/5);
+                if(increment < 1) {
+                    increment = 1;
+                }//end if
+
+                return SetStart(txtbox);
+            } catch {
+                MessageBox.Show("Invalid hash", "Error");
+                return false;
+            }
         }//end method
 
         private string GrabLetter() {

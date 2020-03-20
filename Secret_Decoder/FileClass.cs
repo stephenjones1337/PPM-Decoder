@@ -37,9 +37,11 @@ namespace Secret_Decoder {
                 LoadedBitmap = ppm.ConvertToBitmap();                
 
                 //SAVE PICTURE TO IMAGE BOX
-                BitmapConverter bmpcon = new BitmapConverter(LoadedBitmap);
-                if (bmpcon != null)
+                if (LoadedBitmap != null) {
+
+                    BitmapConverter bmpcon = new BitmapConverter(LoadedBitmap);
                     ImgPicture.Source = bmpcon.ConvertBitmapToImageSource();
+                }
 
                 //IF YOU TRIED TO LOAD P1
                 if(ppm.IncorrectLoad) {

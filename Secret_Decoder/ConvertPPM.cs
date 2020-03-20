@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Windows;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -46,31 +47,36 @@ namespace Secret_Decoder {
         public Bitmap ConvertToBitmap() {
             reader = new BinaryReader(new FileStream(File, FileMode.Open));
             char[] id = reader.ReadChars(2);
+            try {
 
-            //CHECK FIRST CHARS TO CHECK PPM TYPE
-            if(id[1] == '3') {
-                //DO UNCOMPRESSED ASCII STUFF
-                return RawAsciiReader();
-            } else if (id[1] == '6') {
-                //DO UNCOMPRESSED BINARY STUFF
-                return RawBinaryReader();
-            } else if (id[1] == '7') {
-                //DO COMPRESSED ASCII STUFF
-                return DecompressRleAsciiReader();
-            } else if (id[1] == '8') { 
-                //DO COMPRESSED BINARY STUFF
-                return DecompressRleBinaryReader();
-            }  else if (id[1] == '9') {
-                //DO COMPRESSED ASCII STUFF
-                return DecompressLzwAsciiReader();
-            } else if (id[1] == '1') { 
-                //DO COMPRESSED BINARY STUFF
-                return DecompressLzwBinaryReader();
-            } else {
-                //SEND EXCEPTION WINDOW AND LOAD YOU MESSED UP PICTURE
-                ex.LoadedP1();
+                //CHECK FIRST CHARS TO CHECK PPM TYPE
+                if(id[1] == '3') {
+                    //DO UNCOMPRESSED ASCII STUFF
+                    return RawAsciiReader();
+                } else if (id[1] == '6') {
+                    //DO UNCOMPRESSED BINARY STUFF
+                    return RawBinaryReader();
+                } else if (id[1] == '7') {
+                    //DO COMPRESSED ASCII STUFF
+                    return DecompressRleAsciiReader();
+                } else if (id[1] == '8') { 
+                    //DO COMPRESSED BINARY STUFF
+                    return DecompressRleBinaryReader();
+                }  else if (id[1] == '9') {
+                    //DO COMPRESSED ASCII STUFF
+                    return DecompressLzwAsciiReader();
+                } else if (id[1] == '1') { 
+                    //DO COMPRESSED BINARY STUFF
+                    return DecompressLzwBinaryReader();
+                } else {
+                    //SEND EXCEPTION WINDOW AND LOAD YOU MESSED UP PICTURE
+                    ex.LoadedP1();
+                    return null;
+                }//end if
+            } catch {
+                MessageBox.Show("Error decompressing - Corrupt data","Error");
                 return null;
-            }//end if
+            }
         }//end method
         #endregion
 
@@ -280,36 +286,33 @@ namespace Secret_Decoder {
             Dictionary<int, string> dictionary = new Dictionary<int, string>();
             List<int> compressed = new List<int>();
 
-            StringBuilder builder = new StringBuilder();
             PopulateDictionary(dictionary);
 
-            //num = int.Parse(reader.ReadChar().ToString());
-            //string w = dictionary[num];
-            //string[] ary = new string[reader.BaseStream.Length];
-
             while (reader.BaseStream.Position < reader.BaseStream.Length) {
-                    compressed.Add(Convert.ToInt32(reader.ReadByte()));                
+                compressed.Add(reader.ReadByte());                
             }
 
             string w = dictionary[compressed[0]];
             compressed.RemoveAt(0);
             StringBuilder decompressed = new StringBuilder(w);
 
-            foreach(int k in compressed) {                
+            foreach(int k in compressed) {
                 string entry = null;
                 if (dictionary.ContainsKey(k))
                     entry = dictionary[k];
                 else if (k == dictionary.Count)
                     entry = w + w[0];
-
                 decompressed.Append(entry);
 
                 dictionary.Add(dictionary.Count, w + entry[0]);
 
                 w = entry;
             }
+
             char[] splitter = {'\n'};
-            return FillColorQueue(decompressed.ToString().Split(splitter, StringSplitOptions.RemoveEmptyEntries));
+            string toSplit = decompressed.ToString();
+            string[] split = toSplit.Split(splitter, StringSplitOptions.RemoveEmptyEntries);
+            return FillColorQueue(split);
         }
         private Queue<Color> AddColorsLzwAscii() {
             string numStr = "";
@@ -345,7 +348,9 @@ namespace Secret_Decoder {
                 w = entry;
             }
             char[] splitter = {'\n'};
-            return FillColorQueue(decompressed.ToString().Split(splitter, StringSplitOptions.RemoveEmptyEntries));
+            string toSplit = decompressed.ToString();
+            string[] split = toSplit.Split(splitter, StringSplitOptions.RemoveEmptyEntries);
+            return FillColorQueue(split);
         }
 
         private void PopulateDictionary(Dictionary<int, string> dictionary) {
