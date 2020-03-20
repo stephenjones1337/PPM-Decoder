@@ -2,8 +2,27 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Text;
 
 namespace Secret_Decoder {
+    class colValue {
+        public int R;
+        public int G;
+        public int B;
+        public bool full;
+        public colValue() {
+            full = false;
+        }
+        public void Clear() {
+            R = -1;
+            G = -1;
+            B = -1;
+            full = false;
+        }
+        public Color MakeColor() {
+            return Color.FromArgb(R,G,B);
+        }
+    }
     class ConvertPPM {
         ExceptionClass ex = new ExceptionClass();
         private Bitmap myMap;
@@ -37,40 +56,166 @@ namespace Secret_Decoder {
                 return RawBinaryReader();
             } else if (id[1] == '7') {
                 //DO COMPRESSED ASCII STUFF
-                return DecompressRawAsciiReader();
+                return DecompressRleAsciiReader();
             } else if (id[1] == '8') { 
                 //DO COMPRESSED BINARY STUFF
-                return DecompressRawBinaryReader();
+                return DecompressRleBinaryReader();
+            }  else if (id[1] == '9') {
+                //DO COMPRESSED ASCII STUFF
+                return DecompressLzwAsciiReader();
+            } else if (id[1] == '1') { 
+                //DO COMPRESSED BINARY STUFF
+                return DecompressLzwBinaryReader();
             } else {
                 //SEND EXCEPTION WINDOW AND LOAD YOU MESSED UP PICTURE
                 ex.LoadedP1();
-                Bitmap bitmap = new Bitmap(@"C:\users\MCA\pictures\messedup.jpg"); 
-                IncorrectLoad = true;
-                return bitmap;
+                return null;
             }//end if
         }//end method
         #endregion
 
-        #region ASCII STUFF
+        #region ASCII READERS
         private Bitmap RawAsciiReader() {
-            Bitmap bitmap;
+            //CREATE BITMAP
+            Bitmap bitmap = ReadHeader();
+
+            if (bitmap == null) return null;
+
+            //FILL BITMAP
+            for(int y = 0; y < bitmap.Height; y++) {
+                for(int x = 0; x < bitmap.Width; x++) {
+                    int r = Convert.ToInt32(RGBGrabber()),
+                        g = Convert.ToInt32(RGBGrabber()),
+                        b = Convert.ToInt32(RGBGrabber());
+                    Color colors = Color.FromArgb(r, g, b);
+                    bitmap.SetPixel(x, y, colors);
+                }//end for
+            }//end for
+            reader.Close();
+            return bitmap;
+        }//end method
+        private Bitmap DecompressRleAsciiReader() {
+            //TODO: DECOMPRESS P7 INTO P3 AND THEN READ IT
+            //CREATE BITMAP
+            Bitmap bitmap = ReadHeader();
+
+            if (bitmap == null) return null;
+
+            Queue<Color> colors = AddColorsRleAscii();
+
+            //FILL BITMAP
+            for(int y = 0; y < bitmap.Height; y++) {
+                for(int x = 0; x < bitmap.Width; x++) {
+                    //repeating function goes here
+                    bitmap.SetPixel(x, y, colors.Dequeue());
+                }//end for
+            }//end for
+            reader.Close();
+            return bitmap;
+        }//end method
+        private Bitmap DecompressLzwAsciiReader() {
+            Bitmap bitmap = ReadHeader();
+
+            if (bitmap == null) return null;
+
+            Queue<Color> colors = AddColorsLzwAscii();
+
+            //FILL BITMAP
+            for(int y = 0; y < bitmap.Height; y++) {
+                for(int x = 0; x < bitmap.Width; x++) {
+                    //repeating function goes here
+                    bitmap.SetPixel(x, y, colors.Dequeue());
+                }//end for
+            }//end for
+            reader.Close();
+            return bitmap;
+        }
+        #endregion
+
+        #region BINARY READERS
+        private Bitmap RawBinaryReader() {
+            //CREATE BITMAP
+            Bitmap bitmap = ReadHeader();
+
+            if (bitmap == null) return null;
+
+            //FILL BITMAP
+            for(int y = 0; y < bitmap.Height; y++) {
+                for(int x = 0; x < bitmap.Width; x++) {
+
+                    int r = Convert.ToInt32(reader.ReadByte()),
+                        g = Convert.ToInt32(reader.ReadByte()),
+                        b = Convert.ToInt32(reader.ReadByte());
+
+                    Color colors = Color.FromArgb(r, g, b);
+                    bitmap.SetPixel(x, y, colors);
+
+                }//end for
+            }//end for
+            reader.Close();
+            return bitmap;
+        }//end method
+        private Bitmap DecompressRleBinaryReader() {
+            //CREATE BITMAP
+            Bitmap bitmap = ReadHeader();
+
+            if (bitmap == null) return null;
+
+            Queue<Color> colors = AddColorsRleBinary();
+
+            //FILL BITMAP
+            for(int y = 0; y < bitmap.Height; y++) {
+                for(int x = 0; x < bitmap.Width; x++) {
+
+                    bitmap.SetPixel(x, y, colors.Dequeue());
+
+                }//end for
+            }//end for
+            reader.Close();
+            return bitmap;
+        }//end method
+        private Bitmap DecompressLzwBinaryReader() {
+            //CREATE BITMAP
+            Bitmap bitmap = ReadHeader();
+
+            if (bitmap == null) return null;
+
+            Queue<Color> colors = AddColorsLzwBinary();
+
+            //FILL BITMAP
+            for(int y = 0; y < bitmap.Height; y++) {
+                for(int x = 0; x < bitmap.Width; x++) {
+
+                    bitmap.SetPixel(x, y, colors.Dequeue());
+
+                }//end for
+            }//end for
+            reader.Close();
+            return bitmap;
+        }
+        #endregion
+        #region TOOLS
+        private Bitmap ReadHeader() {
             string widths = "", heights = "";
             int width, height;
             char temp;
 
             //SKIP CHAR \n
-            temp = reader.ReadChar();
+            while(reader.ReadChar() != '\n') { };
 
             //SKIP LINE 2
-            while((temp = reader.ReadChar()) != '\n') { };
+            while(reader.ReadChar() != '\n') { };
 
             //GRAB WIDTH AND HEIGHT OF IMAGE
-            while((temp = reader.ReadChar()) != ' ') widths += temp;
+            while((temp = reader.ReadChar()) != ' ') 
+                widths += temp;
 
-            while((temp = reader.ReadChar()) >= '0' && temp <= '9') heights += temp;
+            while((temp = reader.ReadChar()) >= '0' && temp <= '9') 
+                heights += temp;
 
             //CHECK COLOR SPECS
-            if(reader.ReadChar() != '2' || reader.ReadChar() != '5' || reader.ReadChar() != '5') return null;
+            if(reader.ReadChar() != '2' || reader.ReadChar() != '5' || reader.ReadChar() != '5') 
+                return null;
 
             //SKIP CHAR \n
             reader.ReadChar();
@@ -80,21 +225,8 @@ namespace Secret_Decoder {
             height = int.Parse(heights);
 
             //CREATE BITMAP
-            bitmap = new Bitmap(width, height);
-
-            //FILL BITMAP
-            for(int y = 0; y < height; y++) {
-                for(int x = 0; x < width; x++) {
-                    int r = Convert.ToInt32(RGBGrabber()),
-                        g = Convert.ToInt32(RGBGrabber()),
-                        b = Convert.ToInt32(RGBGrabber());
-                    Color colors = Color.FromArgb(r, g, b);
-                    bitmap.SetPixel(x, y, colors);
-                }//end for
-            }//end for
-            return bitmap;
-        }//end method
-
+            return new Bitmap(width, height);
+        }
         private string RGBGrabber() {
             string colVal = "";
             char temp;
@@ -105,51 +237,7 @@ namespace Secret_Decoder {
 
             return colVal;
         }//end method
-
-        private Bitmap DecompressRawAsciiReader() {
-            //TODO: DECOMPRESS P7 INTO P3 AND THEN READ IT
-            Bitmap bitmap;
-            string widths = "", heights = "";
-            int width, height;
-            char temp;
-
-            //SKIP CHAR \n
-            temp = reader.ReadChar();
-
-            //SKIP LINE 2
-            while((temp = reader.ReadChar()) != '\n') { };
-
-            //GRAB WIDTH AND HEIGHT OF IMAGE
-            while((temp = reader.ReadChar()) != ' ') widths += temp;
-
-            while((temp = reader.ReadChar()) >= '0' && temp <= '9') heights += temp;
-
-            //CHECK COLOR SPECS
-            if(reader.ReadChar() != '2' || reader.ReadChar() != '5' || reader.ReadChar() != '5') return null;
-
-            //SKIP CHAR \n
-            reader.ReadChar();
-
-            //SAVE BITMAP SIZE
-            width = int.Parse(widths);
-            height = int.Parse(heights);
-
-            //CREATE BITMAP
-            bitmap = new Bitmap(width, height);
-
-            Queue<Color> colors = AddColorsFromAscii();
-
-            //FILL BITMAP
-            for(int y = 0; y < height; y++) {
-                for(int x = 0; x < width; x++) {
-                    //repeating function goes here
-                    bitmap.SetPixel(x, y, colors.Dequeue());
-                }//end for
-            }//end for
-            return bitmap;
-        }//end method
-
-        private Queue<Color> AddColorsFromAscii() {
+        private Queue<Color> AddColorsRleAscii() {
             char temp;
             Queue<Color> colList = new Queue<Color>();
 
@@ -170,7 +258,7 @@ namespace Secret_Decoder {
             }
             return colList;
         }
-        private Queue<Color> AddColorsFromBinary() {
+        private Queue<Color> AddColorsRleBinary() {
             int repeatNum;
 
             Queue<Color> colList = new Queue<Color>();
@@ -188,100 +276,110 @@ namespace Secret_Decoder {
             }
             return colList;
         }
-        #endregion
+        private Queue<Color> AddColorsLzwBinary() {
+            Dictionary<int, string> dictionary = new Dictionary<int, string>();
+            List<int> compressed = new List<int>();
+            StringBuilder builder = new StringBuilder();
+            Queue<Color> colors = new Queue<Color>();
+            colValue colValue = new colValue();
+            PopulateDictionary(dictionary);
 
-        #region BINARY STUFF
-        private Bitmap RawBinaryReader() {
-            Bitmap bitmap;
-            string widths = "", heights = "";
-            int width, height;
+            //num = int.Parse(reader.ReadChar().ToString());
+            //string w = dictionary[num];
+            //string[] ary = new string[reader.BaseStream.Length];
+
+            while (reader.BaseStream.Position < reader.BaseStream.Length) {                
+                //compressed.Add(Convert.ToInt32(reader.ReadByte()));
+                compressed.Add(reader.ReadByte());
+            }
+            char[] splitter = {'\n'};
+            string saved = builder.ToString();
+            string[] split = saved.Split(splitter, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach(string item in split) {
+                compressed.Add(Convert.ToInt32(item));
+            }
+
+            string w = dictionary[compressed[0]];
+            compressed.RemoveAt(0);
+            StringBuilder decompressed = new StringBuilder(w);
+
+            foreach (int item in compressed) {
+                string entry = null;
+                if (dictionary.ContainsKey(item))
+                    entry = dictionary[item];
+                else if (item == dictionary.Count)
+                    entry = w + w[0];
+
+                decompressed.Append(entry);
+                
+                dictionary.Add(dictionary.Count, w + entry[0]);
+
+                w = entry;
+
+            }
+
+            return null;//FillColorQueue(decompressed.ToString());
+        }
+        private Queue<Color> AddColorsLzwAscii() {
+            string numStr = "";
             char temp;
+            Dictionary<int, string> dictionary = new Dictionary<int, string>();
+            List<int> compressed = new List<int>();
+            PopulateDictionary(dictionary);
 
-            //SKIP CHAR \n
-            reader.ReadChar();
+            while (reader.BaseStream.Position < reader.BaseStream.Length) {
+                if ((temp = reader.ReadChar()) != ',') {
+                    numStr += temp;
+                } else {
+                    compressed.Add(int.Parse(numStr));
+                    numStr = "";
+                }
+            }
 
-            //SKIP LINE 2
-            while((temp = reader.ReadChar()) != '\n') { };
+            string w = dictionary[compressed[0]];
+            compressed.RemoveAt(0);
+            StringBuilder decompressed = new StringBuilder(w);
 
-            //GRAB WIDTH AND HEIGHT OF IMAGE
-            while((temp = reader.ReadChar()) != ' ') widths += temp;
+            foreach(int k in compressed) {                
+                string entry = null;
+                if (dictionary.ContainsKey(k))
+                    entry = dictionary[k];
+                else if (k == dictionary.Count)
+                    entry = w + w[0];
 
-            while((temp = reader.ReadChar()) >= '0' && temp <= '9') heights += temp;
+                decompressed.Append(entry);
 
-            //CHECK COLOR SPECS
-            if(reader.ReadChar() != '2' || reader.ReadChar() != '5' || reader.ReadChar() != '5') return null;
+                dictionary.Add(dictionary.Count, w + entry[0]);
 
-            //SKIP CHAR \n
-            reader.ReadChar();
+                w = entry;
+            }
+            char[] splitter = {'\n'};
+            return FillColorQueue(decompressed.ToString().Split(splitter, StringSplitOptions.RemoveEmptyEntries));
+        }
 
-            //SAVE BITMAP SIZE
-            width = int.Parse(widths);
-            height = int.Parse(heights);
-
-            //CREATE BITMAP
-            bitmap = new Bitmap(width, height);
-
-            //FILL BITMAP
-            for(int y = 0; y < height; y++) {
-                for(int x = 0; x < width; x++) {
-
-                    int r = Convert.ToInt32(reader.ReadByte()),
-                        g = Convert.ToInt32(reader.ReadByte()),
-                        b = Convert.ToInt32(reader.ReadByte());
-
-                    Color colors = Color.FromArgb(r, g, b);
-                    bitmap.SetPixel(x, y, colors);
-
-                }//end for
-            }//end for
-
-            return bitmap;
-        }//end method
-
-        private Bitmap DecompressRawBinaryReader() {
-            //TODO: DECOMPRESS P8 INTO P6 AND THEN READ IT
-            Bitmap bitmap;
-            string widths = "", heights = "";
-            int width, height;
-            char temp;
-
-            //SKIP CHAR \n
-            reader.ReadChar();
-
-            //SKIP LINE 2
-            while((temp = reader.ReadChar()) != '\n') { };
-
-            //GRAB WIDTH AND HEIGHT OF IMAGE
-            while((temp = reader.ReadChar()) != ' ') widths += temp;
-
-            while((temp = reader.ReadChar()) >= '0' && temp <= '9') heights += temp;
-
-            //CHECK COLOR SPECS
-            if(reader.ReadChar() != '2' || reader.ReadChar() != '5' || reader.ReadChar() != '5') return null;
-
-            //SKIP CHAR \n
-            reader.ReadChar();
-
-            //SAVE BITMAP SIZE
-            width = int.Parse(widths);
-            height = int.Parse(heights);
-
-            //CREATE BITMAP
-            bitmap = new Bitmap(width, height);
-
-            Queue<Color> colors = AddColorsFromBinary();
-
-            //FILL BITMAP
-            for(int y = 0; y < height; y++) {
-                for(int x = 0; x < width; x++) {
-
-                    bitmap.SetPixel(x, y, colors.Dequeue());
-
-                }//end for
-            }//end for
-
-            return bitmap;
-        }//end method
+        private void PopulateDictionary(Dictionary<int, string> dictionary) {
+            for (int i = 0; i < 128; i++) {
+                dictionary.Add(i,((char)i).ToString());
+            }
+        }
+        private void AddToColValue(colValue colValue, int color, string value) {
+            if (color == 1) {
+                colValue.R = int.Parse(value);
+            }else if (color == 2) {
+                colValue.G = int.Parse(value);
+            }else if (color == 3) {
+                colValue.B = int.Parse(value);
+                colValue.full = true;
+            }
+        }
+        private Queue<Color> FillColorQueue(string[] colors) {
+            Queue<Color> colorQ = new Queue<Color>();
+            for (int i = 0; i < colors.Length; i+=3) {
+                colorQ.Enqueue(Color.FromArgb(int.Parse(colors[i]), int.Parse(colors[i+1]), int.Parse(colors[i+2])));
+            }
+            return colorQ;
+        }
         #endregion
     }
 }
