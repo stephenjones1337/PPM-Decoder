@@ -279,47 +279,37 @@ namespace Secret_Decoder {
         private Queue<Color> AddColorsLzwBinary() {
             Dictionary<int, string> dictionary = new Dictionary<int, string>();
             List<int> compressed = new List<int>();
+
             StringBuilder builder = new StringBuilder();
-            Queue<Color> colors = new Queue<Color>();
-            colValue colValue = new colValue();
             PopulateDictionary(dictionary);
 
             //num = int.Parse(reader.ReadChar().ToString());
             //string w = dictionary[num];
             //string[] ary = new string[reader.BaseStream.Length];
 
-            while (reader.BaseStream.Position < reader.BaseStream.Length) {                
-                //compressed.Add(Convert.ToInt32(reader.ReadByte()));
-                compressed.Add(reader.ReadByte());
-            }
-            char[] splitter = {'\n'};
-            string saved = builder.ToString();
-            string[] split = saved.Split(splitter, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach(string item in split) {
-                compressed.Add(Convert.ToInt32(item));
+            while (reader.BaseStream.Position < reader.BaseStream.Length) {
+                    compressed.Add(Convert.ToInt32(reader.ReadByte()));                
             }
 
             string w = dictionary[compressed[0]];
             compressed.RemoveAt(0);
             StringBuilder decompressed = new StringBuilder(w);
 
-            foreach (int item in compressed) {
+            foreach(int k in compressed) {                
                 string entry = null;
-                if (dictionary.ContainsKey(item))
-                    entry = dictionary[item];
-                else if (item == dictionary.Count)
+                if (dictionary.ContainsKey(k))
+                    entry = dictionary[k];
+                else if (k == dictionary.Count)
                     entry = w + w[0];
 
                 decompressed.Append(entry);
-                
+
                 dictionary.Add(dictionary.Count, w + entry[0]);
 
                 w = entry;
-
             }
-
-            return null;//FillColorQueue(decompressed.ToString());
+            char[] splitter = {'\n'};
+            return FillColorQueue(decompressed.ToString().Split(splitter, StringSplitOptions.RemoveEmptyEntries));
         }
         private Queue<Color> AddColorsLzwAscii() {
             string numStr = "";
